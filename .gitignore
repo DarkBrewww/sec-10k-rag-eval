@@ -1,0 +1,11 @@
+.env
+data/
+sec-edgar-filings/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
