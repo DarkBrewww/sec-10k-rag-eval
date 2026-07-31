@@ -1,5 +1,14 @@
 .env
-data/
+
+# Derived data stays out of git: raw filings (~200MB), extracted sections, and
+# the Chroma index are all reproducible from `python -m scripts.build_index`.
+# The golden dataset is the exception — it is hand-curated ground truth, the
+# measuring instrument for the whole eval harness, and must be diffable in
+# review. Note `data/*` rather than `data/`: git will not descend into an
+# excluded directory, so the negation below only works with the wildcard form.
+data/*
+!data/golden/
+
 sec-edgar-filings/
 __pycache__/
 *.pyc

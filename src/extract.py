@@ -23,13 +23,25 @@ from . import config
 
 
 # Pattern matches real section headers like "Item 1A.", "ITEM 7.", "Item 7A:".
-# The trailing period/colon is load-bearing: 10-Ks (MSFT especially) repeat a
-# running "Item 7" page header on every page of a section and pepper the body
-# with cross-references ("see Item 8", "Item 7 of this Form 10-K"). Without the
-# punctuation requirement those ~20 spurious matches per section shred the
-# longest-span heuristic into page-sized fragments. Real headers always carry
-# the period; running headers and cross-refs do not.
-_ITEM_RE = re.compile(r"Item\s+(\d+[A-Za-z]?)[.:]", re.IGNORECASE)
+# Two discriminators, both load-bearing, each learned from a filing that broke
+# the naive version:
+#
+#   1. Trailing period/colon. 10-Ks (MSFT especially) repeat a running "Item 7"
+#      page header on every page of a section and pepper the body with bare
+#      cross-references ("see Item 8", "Item 7 of this Form 10-K"). Without the
+#      punctuation requirement those ~20 spurious matches per section shred the
+#      longest-span heuristic into page-sized fragments.
+#
+#   2. Line anchoring. Punctuation alone is not enough: a cross-reference that
+#      ends a sentence looks identical ("...included in Part II, Item 8."). That
+#      single match truncated GOOGL's FY2022 MD&A to 8k of 56k chars. Real
+#      headers begin a line; inline cross-references never do.
+#
+# Note [ \t] rather than \s throughout — \s matches newlines, which would let a
+# match straddle lines and defeat the anchor.
+_ITEM_RE = re.compile(
+    r"^[ \t]*Item[ \t]+(\d+[A-Za-z]?)[.:]", re.IGNORECASE | re.MULTILINE
+)
 
 # Fiscal-year-end statement from the filing cover page. The window in
 # _extract_fiscal_year must be wide enough to reach it — in these filings the

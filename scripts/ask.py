@@ -22,6 +22,11 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    # Windows consoles default to cp1252, which mangles the section sign used in
+    # chunk labels and citations. Force UTF-8 where the stream supports it.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     result = answer(args.question, top_k=args.top_k)
 
     if args.show_chunks:
