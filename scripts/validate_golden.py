@@ -62,14 +62,26 @@ VAGUE_TIME_TERMS = ("currently", "right now", "at present", "nowadays", "these d
 COMPOUND_RE = re.compile(r"\band (?:how|what|why|when|which|where)\b", re.IGNORECASE)
 
 
-def load_corpus_index() -> set[tuple[str, int, str]]:
-    """Return the (company, year, section) triples that actually exist on disk."""
-    triples: set[tuple[str, int, str]] = set()
+def normalize(text: str) -> str:
+    """Collapse whitespace and fold curly quotes, for verbatim-quote matching.
+
+    Extraction leaves arbitrary line breaks inside sentences, and a human typing
+    a quote will use straight quotes where the filing has curly ones. Neither
+    difference changes what the text says, so neither should fail a check.
+    """
+    text = text.replace("’", "'").replace("‘", "'")
+    text = text.replace("“", '"').replace("”", '"')
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def load_corpus() -> dict[tuple[str, int, str], str]:
+    """Map each (company, year, section) on disk to its normalized text."""
+    corpus: dict[tuple[str, int, str], str] = {}
     for path in sorted(config.EXTRACTED_DIR.glob("*.json")):
         with open(path, "r", encoding="utf-8") as f:
             rec = json.load(f)
-        triples.add((rec["company"], rec["fiscal_year"], rec["section"]))
-    return triples
+        corpus[(rec["company"], rec["fiscal_year"], rec["section"])] = normalize(rec["text"])
+    return corpus
 
 
 def load_items(path: Path) -> list[dict]:
@@ -90,7 +102,7 @@ def load_items(path: Path) -> list[dict]:
 
 def validate_item(
     item: dict,
-    corpus: set[tuple[str, int, str]],
+    corpus: dict[tuple[str, int, str], str],
     seen_ids: set[str],
 ) -> tuple[list[str], list[str]]:
     """Check one dataset item. Returns (errors, warnings)."""
@@ -162,6 +174,24 @@ def validate_item(
         if tier == 3 and len({(s.get("company"), s.get("year")) for s in sources}) < 2:
             errors.append("tier 3 (cross-document) must cite 2+ distinct filings")
 
+    # Optional `evidence`: verbatim passages the gold answer rests on. Each must
+    # appear word-for-word in one of the cited sections. This is what makes a
+    # drafted item cheap to verify — the reviewer checks that the answer follows
+    # from real text, and never has to wonder whether the quote was invented.
+    evidence = item.get("evidence")
+    if evidence is not None:
+        if not isinstance(evidence, list) or not all(isinstance(q, str) and q.strip() for q in evidence):
+            errors.append("evidence must be a list of non-empty strings")
+        elif corpus:
+            cited = [
+                corpus[(s["company"], s["year"], s["section"])]
+                for s in sources
+                if isinstance(s, dict) and (s.get("company"), s.get("year"), s.get("section")) in corpus
+            ]
+            for quote in evidence:
+                if not any(normalize(quote) in text for text in cited):
+                    errors.append(f"evidence not found verbatim in cited sources: {quote[:70]!r}...")
+
     if not isinstance(item["gold_supporting_chunks"], list):
         errors.append("gold_supporting_chunks must be a list")
 
@@ -197,7 +227,7 @@ def main() -> int:
         print(f"No items found in {args.path}. Nothing to validate yet.")
         return 0
 
-    corpus = load_corpus_index()
+    corpus = load_corpus()
     if not corpus:
         print("WARNING: no extracted sections found — run build_index first. "
               "Skipping corpus cross-checks.", file=sys.stderr)

@@ -87,6 +87,22 @@ rather than silently scoring as a retrieval failure.
 | `gold_sources` | Which filings should ground the answer. Drives retrieval scoring: did we retrieve anything from these? Empty for abstaining items. |
 | `gold_supporting_chunks` | Specific chunk IDs that support the answer. Drives faithfulness scoring. Populated *after* an index build, since chunk IDs depend on chunking output. |
 | `notes` | Anything worth recording — ambiguity resolved, why an item is tricky, verification caveats. |
+| `evidence` | *Optional.* Verbatim passages the gold answer rests on. The validator checks each one appears word-for-word in a cited section, so a quote cannot be invented or paraphrased. Kept in the final dataset so any reviewer can re-verify an item in seconds. |
+
+## Workflow: drafts → review → dataset
+
+Items are written in batches into `drafts/`, reviewed by a human, and only then
+moved into `questions.jsonl`. Tiers 1 and 4 are drafted with tooling assistance
+and every draft carries `evidence`; tiers 2 and 3 are written by hand.
+
+```bash
+python -m scripts.validate_golden --path data/golden/drafts/tier1_batch01.jsonl
+```
+
+Reviewing a draft means checking three things: the gold answer follows from the
+evidence, the question is unambiguous, and it isn't one of the anti-patterns
+below. The validator has already ruled out the fourth failure mode, a quote that
+isn't really in the filing.
 
 ## How questions are sourced
 

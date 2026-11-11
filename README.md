@@ -1,3 +1,4 @@
+
 # SEC RAG Eval
 
 **A retrieval-augmented question-answering system over SEC 10-K filings, built as the test subject for a from-scratch LLM evaluation harness.**
