@@ -18,3 +18,7 @@ venv/
 *.egg-info/
 .pytest_cache/
 .ipynb_checkpoints/
+
+# Claude Code: personal, per-machine files
+CLAUDE.local.md
+.claude/settings.local.json
